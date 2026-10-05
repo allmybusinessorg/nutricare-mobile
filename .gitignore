@@ -1,0 +1,16 @@
+# Android / Kotlin
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Environment (never commit real keys)
+.env*
+*.keystore
+!debug.keystore
