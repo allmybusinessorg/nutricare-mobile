@@ -39,7 +39,16 @@ object ServiceLocator {
         }
 
         val ktor = HttpClient(Android) {
+            engine {
+                connectTimeout = 30_000
+                socketTimeout = 60_000
+            }
             install(ContentNegotiation) { json(json) }
+            install(io.ktor.client.plugins.HttpTimeout) {
+                requestTimeoutMillis = 60_000
+                connectTimeoutMillis = 30_000
+                socketTimeoutMillis = 60_000
+            }
         }
         api = ApiClient(ktor, supabase)
     }

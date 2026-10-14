@@ -169,3 +169,15 @@ data class ChatSimpleResponse(
     val provider: String? = null,
     val error: String? = null,
 )
+
+@Serializable
+data class OnboardingRequest(
+    val userId: String,
+    val name: String? = null,
+    val age: Int? = null,
+    val gender: String? = null,
+    val height: Double? = null,
+    val weight: Double? = null,
+    val goal: String? = null,
+    val selectedDiseases: List<String> = emptyList(),
+)

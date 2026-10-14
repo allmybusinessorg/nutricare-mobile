@@ -81,6 +81,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+import com.nutricare.mobile.ui.components.OnboardingDialog
+
 data class ProfileUiState(
     val name: String = "",
     val email: String = "",
@@ -96,6 +98,16 @@ class ProfileViewModel : ViewModel() {
     val state = MutableStateFlow(ProfileUiState())
     val passwordEvent = MutableStateFlow<String?>(null)
     val changingPassword = MutableStateFlow(false)
+
+    fun updateProfile(p: Profile, conditions: List<String>) {
+        state.update {
+            it.copy(
+                name = p.name ?: it.name,
+                profile = p,
+                conditions = conditions
+            )
+        }
+    }
 
     fun load() {
         viewModelScope.launch {
@@ -230,8 +242,22 @@ fun ProfileScreen(onSignedOut: () -> Unit = {}, vm: ProfileViewModel = viewModel
     val context = LocalContext.current
 
     var showAddFamilyDialog by remember { mutableStateOf(false) }
+    var showEditProfileDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { vm.load() }
+
+    if (showEditProfileDialog) {
+        OnboardingDialog(
+            initialName = state.name,
+            initialProfile = state.profile,
+            initialConditions = state.conditions,
+            isEditing = true,
+            onDismiss = { showEditProfileDialog = false },
+            onSaved = { updatedProfile, updatedConditions ->
+                vm.updateProfile(updatedProfile, updatedConditions)
+            }
+        )
+    }
 
     Column(
         Modifier
@@ -285,7 +311,24 @@ fun ProfileScreen(onSignedOut: () -> Unit = {}, vm: ProfileViewModel = viewModel
             elevation = CardDefaults.cardElevation(2.dp)
         ) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("HEALTH DETAILS", style = MaterialTheme.typography.labelSmall, color = EmeraldDark)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("HEALTH DETAILS", style = MaterialTheme.typography.labelSmall, color = EmeraldDark)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(Color(0xFFF0FDFA), RoundedCornerShape(8.dp))
+                            .clickable { showEditProfileDialog = true }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text("Edit", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = EmeraldDark)
+                        Spacer(Modifier.width(4.dp))
+                        Text("✎", color = EmeraldDark, fontSize = 12.sp)
+                    }
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Detail("Age", state.profile?.age?.toString(), Modifier.weight(1f))
                     Detail("Height", state.profile?.height?.let { "$it cm" }, Modifier.weight(1f))

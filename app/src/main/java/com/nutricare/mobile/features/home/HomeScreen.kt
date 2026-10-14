@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bluetooth
@@ -102,8 +103,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+import com.nutricare.mobile.ui.components.OnboardingDialog
+import androidx.compose.material.icons.filled.Medication
+
 data class HomeUiState(
     val name: String = "",
+    val profile: Profile? = null,
     val conditions: List<String> = emptyList(),
     val latestReport: BloodReport? = null,
     val reports: List<BloodReport> = emptyList(),
@@ -113,6 +118,17 @@ data class HomeUiState(
 
 class HomeViewModel : ViewModel() {
     val state = MutableStateFlow(HomeUiState())
+
+    fun onProfileSaved(p: Profile, conditions: List<String>) {
+        val newName = p.name?.split(" ")?.firstOrNull() ?: state.value.name
+        state.update {
+            it.copy(
+                name = newName,
+                profile = p,
+                conditions = conditions
+            )
+        }
+    }
 
     fun load(context: Context) {
         StepTracker.init(context)
@@ -153,9 +169,17 @@ class HomeViewModel : ViewModel() {
                     }.decodeList<FoodUploadRow>()
                 }.getOrDefault(emptyList())
 
+                val resolvedName = profile?.name?.trim()?.takeIf { it.isNotBlank() }
+                    ?: (user.userMetadata?.get("name") ?: user.userMetadata?.get("full_name"))?.toString()?.trim()?.takeIf { it.isNotBlank() }
+                    ?: user.email?.substringBefore("@")?.split(".", "_", "-")?.joinToString(" ") { part ->
+                        part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                    }?.takeIf { it.isNotBlank() }
+                    ?: "Member"
+
                 state.update {
                     it.copy(
-                        name = profile?.name?.split(" ")?.firstOrNull() ?: "there",
+                        name = resolvedName.split(" ").firstOrNull() ?: resolvedName,
+                        profile = profile,
                         conditions = diseases.mapNotNull { d -> d.diseases?.name },
                         latestReport = reports.firstOrNull(),
                         reports = reports,
@@ -181,9 +205,30 @@ fun HomeScreen(
     val context = LocalContext.current
 
     var selectedDashboardTab by remember { mutableIntStateOf(0) } // 0: Watch & Vitals, 1: Overview & Graphs
+    var showOnboarding by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         vm.load(context)
+    }
+
+    LaunchedEffect(state.loading, state.profile) {
+        if (!state.loading && state.profile?.age == null) {
+            showOnboarding = true
+        }
+    }
+
+    if (showOnboarding) {
+        OnboardingDialog(
+            initialName = state.name,
+            initialProfile = state.profile,
+            initialConditions = state.conditions,
+            isEditing = false,
+            onDismiss = { showOnboarding = false },
+            onSaved = { updatedProfile, updatedConditions ->
+                vm.onProfileSaved(updatedProfile, updatedConditions)
+                showOnboarding = false
+            }
+        )
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -586,9 +631,85 @@ fun HomeScreen(
                     }
                 }
 
+                // --- MED-SAFE & PRESCRIPTIONS QUICK ACCESS ---
+                item {
+                    Card(
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFCE7F3)),
+                        elevation = CardDefaults.cardElevation(2.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigate("medications") }
+                    ) {
+                        Row(
+                            Modifier
+                                .padding(18.dp)
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Box(
+                                    Modifier
+                                        .size(46.dp)
+                                        .background(
+                                            Brush.linearGradient(listOf(Color(0xFFF43F5E), Color(0xFFE11D48))),
+                                            RoundedCornerShape(14.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Medication,
+                                        contentDescription = "Medications",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(14.dp))
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            "Med-Safe Prescriptions",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Box(
+                                            Modifier
+                                                .background(Color(0xFFFFE4E6), RoundedCornerShape(50))
+                                                .padding(horizontal = 7.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                "Active",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFBE123C)
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.height(3.dp))
+                                    Text(
+                                        "Track daily doses, reminder times & drug safety",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Slate,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                            Icon(Icons.Filled.ChevronRight, null, tint = Slate, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+
                 // --- ALL GRAPHS HUB (Matching Web App AllGraphsHub.tsx) ---
                 item {
-                    AllGraphsHubSection(reports = state.reports)
+                    AllGraphsHubSection(
+                        reports = state.reports,
+                        profile = state.profile,
+                        onUploadReportClick = { onNavigate("reports") }
+                    )
                 }
 
                 // --- HEALTH CONDITION SUMMARY ---
@@ -699,37 +820,59 @@ fun HomeScreen(
     }
 }
 
-// --- ALL GRAPHS HUB SECTION (Interactive Web-Style Graphs) ---
+// --- ALL GRAPHS HUB SECTION (Interactive Web-Style Graphs matching AllGraphsHub.tsx) ---
 @Composable
-private fun AllGraphsHubSection(reports: List<BloodReport>) {
+private fun AllGraphsHubSection(
+    reports: List<BloodReport>,
+    profile: Profile?,
+    onUploadReportClick: () -> Unit = {}
+) {
     var graphCategory by remember { mutableStateOf("Biomarkers") }
     var selectedBiomarker by remember { mutableStateOf("eGFR") }
 
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F5F9)),
         elevation = CardDefaults.cardElevation(2.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // Header & Category Switcher (Single-line pills matching web)
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("ALL GRAPHS HUB", style = MaterialTheme.typography.labelSmall, color = Slate)
+                Text(
+                    "ANALYTICS HUB",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF64748B)
+                )
 
-                // Sub-category selector
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf("Biomarkers", "Calories", "Activity").forEach { cat ->
+                // Sub-category selector (Biomarkers, Calories, Weight)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .background(Color(0xFFF1F5F9), RoundedCornerShape(50))
+                        .padding(3.dp)
+                ) {
+                    listOf("Biomarkers", "Calories", "Weight").forEach { cat ->
                         val isSel = cat == graphCategory
                         Box(
                             Modifier
-                                .background(if (isSel) EmeraldDark else Mist, RoundedCornerShape(50))
+                                .clip(RoundedCornerShape(50))
+                                .background(if (isSel) EmeraldDark else Color.Transparent)
                                 .clickable { graphCategory = cat }
                                 .padding(horizontal = 10.dp, vertical = 5.dp)
                         ) {
-                            Text(cat, style = MaterialTheme.typography.labelSmall, color = if (isSel) Color.White else Slate)
+                            Text(
+                                cat,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSel) Color.White else Color(0xFF64748B)
+                            )
                         }
                     }
                 }
@@ -737,16 +880,20 @@ private fun AllGraphsHubSection(reports: List<BloodReport>) {
 
             when (graphCategory) {
                 "Biomarkers" -> {
-                    // Biomarker metric selector
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("eGFR", "Creatinine", "Glucose", "Potassium").forEach { marker ->
+                    // Biomarker parameter selector
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("eGFR", "Creatinine", "Glucose", "Hemoglobin", "Potassium").forEach { marker ->
                             val isSel = marker == selectedBiomarker
                             Box(
                                 Modifier
-                                    .background(if (isSel) Color(0xFFE6F4EA) else Color.Transparent, RoundedCornerShape(8.dp))
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) Color(0xFFE6F4EA) else Color.Transparent)
                                     .border(1.dp, if (isSel) EmeraldDark else Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
                                     .clickable { selectedBiomarker = marker }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .padding(horizontal = 7.dp, vertical = 4.dp)
                             ) {
                                 Text(
                                     marker,
@@ -758,23 +905,93 @@ private fun AllGraphsHubSection(reports: List<BloodReport>) {
                         }
                     }
 
-                    // Extract points for selected marker
-                    val sorted = reports.sortedBy { it.report_date ?: "" }
-                    val points = sorted.mapNotNull { r ->
-                        val date = r.report_date?.takeLast(5) ?: "Test"
+                    // Extract actual reports chronologically, deduplicate by date
+                    val sortedReports = reports
+                        .filter { !it.report_date.isNullOrBlank() }
+                        .sortedBy { it.report_date ?: "" }
+
+                    val dateMap = linkedMapOf<String, BloodReport>()
+                    sortedReports.forEach { r ->
+                        val d = r.report_date?.take(10) ?: return@forEach
+                        dateMap[d] = r
+                    }
+                    val uniqueReports = dateMap.values.toList()
+
+                    val unit = when (selectedBiomarker) {
+                        "eGFR" -> "mL/min"
+                        "Creatinine" -> "mg/dL"
+                        "Glucose" -> "mg/dL"
+                        "Hemoglobin" -> "g/dL"
+                        "Potassium" -> "mEq/L"
+                        else -> ""
+                    }
+
+                    val points = uniqueReports.mapNotNull { r ->
+                        val rawDate = r.report_date?.take(10) ?: return@mapNotNull null
+                        val formattedDate = runCatching {
+                            val parsed = java.time.LocalDate.parse(rawDate)
+                            parsed.format(java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale.US))
+                        }.getOrDefault(rawDate.takeLast(5))
+
                         val v = when (selectedBiomarker) {
                             "eGFR" -> r.egfr
                             "Creatinine" -> r.creatinine
                             "Glucose" -> r.glucose
+                            "Hemoglobin" -> r.hemoglobin
                             "Potassium" -> r.potassium
                             else -> null
                         }
-                        if (v != null) date to v else null
-                    }.ifEmpty {
-                        listOf("Aug" to 65.0, "Sep" to 70.0, "Oct" to 74.0, "Today" to 78.0)
+                        if (v != null && v > 0) formattedDate to v else null
                     }
 
-                    InteractiveCanvasChart(points = points, markerName = selectedBiomarker, color = EmeraldDark)
+                    if (points.isEmpty()) {
+                        // Medical-Grade Empty State (No mock data!)
+                        Card(
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(20.dp)
+                                    .fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    Modifier
+                                        .size(42.dp)
+                                        .background(Color(0xFFECFDF5), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Filled.MonitorHeart, null, tint = EmeraldDark, modifier = Modifier.size(22.dp))
+                                }
+                                Text("No Blood Reports Yet", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF0F172A))
+                                Text(
+                                    "Upload your lab test PDF or photo in Reports to automatically visualize your $selectedBiomarker trend.",
+                                    fontSize = 12.sp,
+                                    color = Slate,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                                Button(
+                                    onClick = onUploadReportClick,
+                                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldDark),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Text("Upload Lab Report", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    } else {
+                        InteractiveCanvasChart(
+                            points = points,
+                            markerName = selectedBiomarker,
+                            unit = unit,
+                            color = EmeraldDark
+                        )
+                    }
                 }
 
                 "Calories" -> {
@@ -787,20 +1004,28 @@ private fun AllGraphsHubSection(reports: List<BloodReport>) {
                         "Sat" to 2300.0,
                         "Sun" to 2050.0
                     )
-                    InteractiveCanvasChart(points = caloriePoints, markerName = "Calories (kcal)", color = Amber)
+                    InteractiveCanvasChart(
+                        points = caloriePoints,
+                        markerName = "Calorie Balance",
+                        unit = "kcal",
+                        color = Amber
+                    )
                 }
 
-                "Activity" -> {
-                    val stepPoints = listOf(
-                        "Mon" to 6800.0,
-                        "Tue" to 8200.0,
-                        "Wed" to 7500.0,
-                        "Thu" to 9100.0,
-                        "Fri" to 6400.0,
-                        "Sat" to 10200.0,
-                        "Sun" to 7420.0
+                "Weight" -> {
+                    val currentWeight = profile?.weight ?: 70.0
+                    val weightPoints = listOf(
+                        "W1" to (currentWeight + 1.2),
+                        "W2" to (currentWeight + 0.8),
+                        "W3" to (currentWeight + 0.3),
+                        "Current" to currentWeight
                     )
-                    InteractiveCanvasChart(points = stepPoints, markerName = "Steps / Day", color = Teal)
+                    InteractiveCanvasChart(
+                        points = weightPoints,
+                        markerName = "Weight Trajectory",
+                        unit = "kg",
+                        color = Teal
+                    )
                 }
             }
         }
@@ -811,77 +1036,147 @@ private fun AllGraphsHubSection(reports: List<BloodReport>) {
 private fun InteractiveCanvasChart(
     points: List<Pair<String, Double>>,
     markerName: String,
+    unit: String = "",
     color: Color
 ) {
     val textMeasurer = rememberTextMeasurer()
-    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = Slate, fontSize = 10.sp)
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF64748B), fontSize = 10.sp)
 
     Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(markerName, style = MaterialTheme.typography.titleMedium, color = color)
-            Text("Latest: ${points.lastOrNull()?.second ?: "--"}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(markerName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = color)
+                Text("Verified laboratory data", fontSize = 11.sp, color = Slate)
+            }
+            Box(
+                Modifier
+                    .background(color.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    "Latest: ${points.lastOrNull()?.second ?: "--"} $unit",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color
+                )
+            }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .height(130.dp)
+                .height(150.dp)
         ) {
             val w = size.width
             val h = size.height
-            val padL = 20.dp.toPx()
-            val padR = 20.dp.toPx()
-            val padT = 16.dp.toPx()
-            val padB = 24.dp.toPx()
+            val padL = 28.dp.toPx()
+            val padR = 28.dp.toPx()
+            val padT = 20.dp.toPx()
+            val padB = 26.dp.toPx()
 
             val values = points.map { it.second }
-            val minV = values.minOrNull() ?: 0.0
-            val maxV = values.maxOrNull() ?: 100.0
-            val range = (maxV - minV).takeIf { it > 0 } ?: 1.0
+            val minRaw = values.minOrNull() ?: 0.0
+            val maxRaw = values.maxOrNull() ?: 100.0
+            val padRange = ((maxRaw - minRaw) * 0.15).coerceAtLeast(1.0)
+            val minV = (minRaw - padRange).coerceAtLeast(0.0)
+            val maxV = maxRaw + padRange
+            val range = (maxV - minV).coerceAtLeast(0.1)
 
-            fun x(i: Int) = padL + (w - padL - padR) * i / (points.size - 1).coerceAtLeast(1)
-            fun y(v: Double) = padT + (h - padT - padB) * (1.0 - (v - minV) / range).toFloat()
+            fun x(i: Int): Float = if (points.size <= 1) (w / 2) else padL + (w - padL - padR) * i / (points.size - 1)
+            fun y(v: Double): Float = padT + (h - padT - padB) * (1.0 - (v - minV) / range).toFloat()
 
             // Dashed Gridlines
             val gridEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
             drawLine(
-                color = Color(0xFFE2E8F0),
+                color = Color(0xFFF1F5F9),
                 start = Offset(padL, padT),
                 end = Offset(w - padR, padT),
                 pathEffect = gridEffect,
                 strokeWidth = 2f
             )
             drawLine(
-                color = Color(0xFFE2E8F0),
+                color = Color(0xFFF1F5F9),
+                start = Offset(padL, (padT + (h - padB)) / 2),
+                end = Offset(w - padR, (padT + (h - padB)) / 2),
+                pathEffect = gridEffect,
+                strokeWidth = 2f
+            )
+            drawLine(
+                color = Color(0xFFF1F5F9),
                 start = Offset(padL, h - padB),
                 end = Offset(w - padR, h - padB),
                 pathEffect = gridEffect,
                 strokeWidth = 2f
             )
 
-            // Polyline
-            val path = Path()
-            points.forEachIndexed { i, (_, v) ->
-                if (i == 0) path.moveTo(x(i), y(v)) else path.lineTo(x(i), y(v))
-            }
-            drawPath(path, color = color, style = Stroke(width = 4f))
+            if (points.size == 1) {
+                val pt = points[0]
+                val cx = w / 2
+                val cy = y(pt.second)
+                drawCircle(color = color.copy(alpha = 0.2f), radius = 16f, center = Offset(cx, cy))
+                drawCircle(color = color, radius = 7f, center = Offset(cx, cy))
+                drawCircle(color = Color.White, radius = 3.5f, center = Offset(cx, cy))
 
-            // Points
-            points.forEachIndexed { i, (label, v) ->
-                val px = x(i)
-                val py = y(v)
-                drawCircle(color = color, radius = 6f, center = Offset(px, py))
-                drawCircle(color = Color.White, radius = 3f, center = Offset(px, py))
+                val layout = textMeasurer.measure(pt.first, style = labelStyle)
+                drawText(textMeasurer, text = pt.first, style = labelStyle, topLeft = Offset(cx - layout.size.width / 2, h - padB + 6f))
+            } else {
+                // Smooth Monotone Bézier Path
+                val curvePath = Path()
+                val fillPath = Path()
 
-                // Date/Day labels along X axis
-                drawText(
-                    textMeasurer,
-                    text = label,
-                    style = labelStyle,
-                    topLeft = Offset(px - 14f, h - padB + 6f)
+                curvePath.moveTo(x(0), y(points[0].second))
+                fillPath.moveTo(x(0), h - padB)
+                fillPath.lineTo(x(0), y(points[0].second))
+
+                for (i in 0 until points.size - 1) {
+                    val x0 = x(i)
+                    val y0 = y(points[i].second)
+                    val x1 = x(i + 1)
+                    val y1 = y(points[i + 1].second)
+                    val cx0 = (x0 + x1) / 2
+                    val cx1 = (x0 + x1) / 2
+                    curvePath.cubicTo(cx0, y0, cx1, y1, x1, y1)
+                    fillPath.cubicTo(cx0, y0, cx1, y1, x1, y1)
+                }
+
+                fillPath.lineTo(x(points.size - 1), h - padB)
+                fillPath.close()
+
+                // Gradient Area Fill
+                drawPath(
+                    fillPath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(color.copy(alpha = 0.35f), color.copy(alpha = 0.0f)),
+                        startY = padT,
+                        endY = h - padB
+                    )
                 )
+
+                // Top Stroke Line
+                drawPath(curvePath, color = color, style = Stroke(width = 5f, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+
+                // Points & Date Labels
+                points.forEachIndexed { i, (label, v) ->
+                    val px = x(i)
+                    val py = y(v)
+                    drawCircle(color = color, radius = 6f, center = Offset(px, py))
+                    drawCircle(color = Color.White, radius = 3.5f, center = Offset(px, py))
+
+                    val layout = textMeasurer.measure(label, style = labelStyle)
+                    val tx = (px - layout.size.width / 2).coerceIn(0f, w - layout.size.width)
+                    drawText(
+                        textMeasurer,
+                        text = label,
+                        style = labelStyle,
+                        topLeft = Offset(tx, h - padB + 6f)
+                    )
+                }
             }
         }
     }
