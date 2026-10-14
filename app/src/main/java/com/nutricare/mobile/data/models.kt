@@ -118,6 +118,7 @@ data class AnalyzeFoodRequest(
 @Serializable
 data class AnalyzeFoodResponse(
     val success: Boolean = false,
+    val is_food: Boolean = true,
     val food: FoodNutrition? = null,
     val evaluation: Evaluation? = null,
     val error: String? = null,

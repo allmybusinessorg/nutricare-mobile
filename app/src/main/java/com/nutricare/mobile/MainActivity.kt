@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
         activityScope.launch {
             try {
                 val session = GoogleOAuth.handleCallback(data)
+                com.nutricare.mobile.core.SessionStore.saveSession(session)
                 ServiceLocator.supabase.auth.importSession(session)
                 AuthEventBus.sessionArrived.tryEmit(session)
             } catch (e: Exception) {

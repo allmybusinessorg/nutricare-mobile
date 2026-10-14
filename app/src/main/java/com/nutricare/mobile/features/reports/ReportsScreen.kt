@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -68,6 +69,7 @@ import com.nutricare.mobile.core.ServiceLocator
 import com.nutricare.mobile.data.BloodReport
 import com.nutricare.mobile.data.OcrData
 import com.nutricare.mobile.ui.theme.Emerald
+import com.nutricare.mobile.ui.theme.Rose
 import com.nutricare.mobile.ui.theme.EmeraldDark
 import com.nutricare.mobile.ui.theme.Mist
 import com.nutricare.mobile.ui.theme.Teal
@@ -163,7 +165,14 @@ class ReportsViewModel : ViewModel() {
                 val user = client.auth.currentUserOrNull() ?: throw Exception("Please sign in first")
                 val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     ?: throw Exception("Could not read the selected file")
-                val ext = context.contentResolver.getType(uri)?.substringAfterLast('/') ?: "jpg"
+                val mimeType = context.contentResolver.getType(uri)?.lowercase() ?: ""
+                val uriStr = uri.toString().lowercase()
+                val ext = when {
+                    mimeType.contains("pdf") || uriStr.endsWith(".pdf") -> "pdf"
+                    mimeType.contains("png") || uriStr.endsWith(".png") -> "png"
+                    mimeType.contains("webp") || uriStr.endsWith(".webp") -> "webp"
+                    else -> "jpg"
+                }
                 val name = "${user.id}-report-${System.currentTimeMillis()}.$ext"
                 client.storage.from("reports").upload(name, bytes)
                 val fileUrl = client.storage.from("reports").publicUrl(name)
@@ -227,7 +236,11 @@ fun ReportsScreen(vm: ReportsViewModel = viewModel()) {
         }
     }
 
-    val pickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val documentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.upload(context, uri)
+    }
+
+    val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) vm.upload(context, uri)
     }
 
@@ -409,26 +422,36 @@ fun ReportsScreen(vm: ReportsViewModel = viewModel()) {
                             Text("Reading & analyzing with Gemini AI…", style = MaterialTheme.typography.bodyMedium)
                         }
                     } else {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = { takeCameraPhoto() },
                                 colors = ButtonDefaults.buttonColors(containerColor = EmeraldDark),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f).height(44.dp)
                             ) {
-                                Icon(Icons.Filled.PhotoCamera, null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Camera")
+                                Icon(Icons.Filled.PhotoCamera, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Camera", fontSize = 12.sp)
                             }
 
                             OutlinedButton(
-                                onClick = { pickLauncher.launch("image/*") },
+                                onClick = { documentLauncher.launch(arrayOf("application/pdf")) },
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f).height(44.dp)
                             ) {
-                                Icon(Icons.Filled.UploadFile, null, modifier = Modifier.size(18.dp), tint = Teal)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Pick File", color = Teal)
+                                Icon(Icons.Filled.UploadFile, null, modifier = Modifier.size(16.dp), tint = Rose)
+                                Spacer(Modifier.width(4.dp))
+                                Text("PDF", color = Color(0xFF0F172A), fontSize = 12.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = { documentLauncher.launch(arrayOf("application/pdf", "image/*")) },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.weight(1.1f).height(44.dp)
+                            ) {
+                                Icon(Icons.Filled.UploadFile, null, modifier = Modifier.size(16.dp), tint = Teal)
+                                Spacer(Modifier.width(4.dp))
+                                Text("All Files", color = Teal, fontSize = 12.sp)
                             }
                         }
                     }

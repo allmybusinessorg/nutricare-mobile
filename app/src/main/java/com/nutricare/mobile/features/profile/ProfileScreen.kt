@@ -262,6 +262,7 @@ fun ProfileScreen(
             onDismiss = { showEditProfileDialog = false },
             onSaved = { updatedProfile, updatedConditions ->
                 vm.updateProfile(updatedProfile, updatedConditions)
+                showEditProfileDialog = false
             }
         )
     }
@@ -718,9 +719,27 @@ private fun Detail(label: String, value: String?, modifier: Modifier = Modifier)
         colors = CardDefaults.cardColors(containerColor = Mist),
         modifier = modifier,
     ) {
-        Column(Modifier.padding(12.dp)) {
-            Text(value ?: "—", style = MaterialTheme.typography.titleMedium)
-            Text(label, style = MaterialTheme.typography.labelSmall)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp, horizontal = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                value ?: "—",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A),
+                maxLines = 1
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = Slate,
+                maxLines = 1
+            )
         }
     }
 }

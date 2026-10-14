@@ -16,8 +16,10 @@ import kotlinx.coroutines.launch
 object SessionStore {
     private const val PREFS = "nutricare_session"
     private const val KEY = "session_json"
+    private var appContext: Context? = null
 
     fun attach(context: Context) {
+        appContext = context.applicationContext
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
         // Restore a saved session (if any) right after startup.
@@ -38,19 +40,53 @@ object SessionStore {
             .onEach { status ->
                 when (status) {
                     is io.github.jan.supabase.auth.status.SessionStatus.Authenticated -> {
-                        runCatching {
-                            prefs.edit()
-                                .putString(KEY, ServiceLocator.json.encodeToString(
-                                    UserSession.serializer(), status.session))
-                                .apply()
-                        }
+                        saveSession(status.session)
                     }
                     is io.github.jan.supabase.auth.status.SessionStatus.NotAuthenticated -> {
-                        prefs.edit().remove(KEY).apply()
+                        clearSession()
                     }
                     else -> Unit
                 }
             }
             .launchIn(CoroutineScope(Dispatchers.IO))
+    }
+
+    fun saveSession(session: UserSession) {
+        val ctx = appContext ?: return
+        runCatching {
+            val jsonStr = ServiceLocator.json.encodeToString(UserSession.serializer(), session)
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY, jsonStr)
+                .apply()
+        }
+    }
+
+    fun clearSession() {
+        val ctx = appContext ?: return
+        runCatching {
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .remove(KEY)
+                .apply()
+        }
+    }
+
+    fun getSavedAccessToken(): String? {
+        val ctx = appContext ?: return null
+        return runCatching {
+            val jsonStr = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null) ?: return null
+            val session = ServiceLocator.json.decodeFromString(UserSession.serializer(), jsonStr)
+            session.accessToken
+        }.getOrNull()
+    }
+
+    fun getSavedRefreshToken(): String? {
+        val ctx = appContext ?: return null
+        return runCatching {
+            val jsonStr = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null) ?: return null
+            val session = ServiceLocator.json.decodeFromString(UserSession.serializer(), jsonStr)
+            session.refreshToken
+        }.getOrNull()
     }
 }

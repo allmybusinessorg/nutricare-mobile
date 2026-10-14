@@ -36,6 +36,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -98,13 +104,30 @@ class ScanViewModel : ViewModel() {
                     description = s.description.trim().ifBlank { null },
                     fileUrl = fileUrl,
                 )
-                if (!response.success || response.food == null) {
-                    state.update { it.copy(loading = false, error = response.error ?: "Could not analyze this food.") }
+                if (!response.success || response.food == null || !response.is_food) {
+                    val errMsg = if (!response.is_food) {
+                        response.error ?: "The selected image does not appear to contain edible food or drink. Please choose or capture a photo of a meal or beverage."
+                    } else {
+                        response.error ?: "Could not analyze this food."
+                    }
+                    state.update { it.copy(loading = false, error = errMsg) }
                 } else {
                     state.update { it.copy(loading = false, result = response) }
                 }
             } catch (e: Exception) {
-                state.update { it.copy(loading = false, error = e.message ?: "Something went wrong.") }
+                val rawMsg = e.message ?: "Something went wrong."
+                val cleanMsg = when {
+                    rawMsg.contains("does not appear to contain", ignoreCase = true) ||
+                    rawMsg.contains("not food", ignoreCase = true) ||
+                    rawMsg.contains("non-food", ignoreCase = true) ->
+                        "The selected image does not appear to contain food (e.g. an animal, person, or object was detected). Please choose or take a photo of an edible meal or beverage."
+                    rawMsg.startsWith("Server error 422: ") ->
+                        rawMsg.removePrefix("Server error 422: ").trim()
+                    rawMsg.startsWith("Server error 400: ") ->
+                        rawMsg.removePrefix("Server error 400: ").trim()
+                    else -> rawMsg
+                }
+                state.update { it.copy(loading = false, error = cleanMsg) }
             }
         }
     }
@@ -131,6 +154,17 @@ fun ScanScreen(vm: ScanViewModel = viewModel()) {
         pendingCameraUri = uri
         vm.onPhoto(uri)
         cameraLauncher.launch(uri)
+    }
+
+    val previewBitmap: ImageBitmap? = androidx.compose.runtime.remember(state.photoUri) {
+        val uri = state.photoUri ?: return@remember null
+        try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                android.graphics.BitmapFactory.decodeStream(stream)?.asImageBitmap()
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     Column(
@@ -167,7 +201,47 @@ fun ScanScreen(vm: ScanViewModel = viewModel()) {
             }
         }
 
-        if (state.photoUri != null) {
+        // Live Image Preview Thumbnail
+        if (previewBitmap != null) {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.CheckCircle, null, tint = EmeraldDark, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Selected Food Photo", style = MaterialTheme.typography.labelMedium, color = EmeraldDark)
+                        }
+                        Text(
+                            "Remove ✕",
+                            color = Rose,
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .clickable { vm.onPhoto(null) }
+                                .padding(4.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    androidx.compose.foundation.Image(
+                        bitmap = previewBitmap,
+                        contentDescription = "Selected photo",
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                }
+            }
+        } else if (state.photoUri != null) {
             Text("📷 Photo attached — AI will identify the food from it.", style = MaterialTheme.typography.bodySmall, color = EmeraldDark)
         }
 
@@ -191,15 +265,75 @@ fun ScanScreen(vm: ScanViewModel = viewModel()) {
             if (state.loading) {
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp)
                 Spacer(Modifier.width(10.dp))
-                Text("Analyzing…")
+                Text("Analyzing meal…")
             } else {
                 Text("Analyze my meal")
             }
         }
 
-        state.error?.let {
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F2))) {
-                Text(it, color = Rose, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(14.dp))
+        state.error?.let { err ->
+            val isNonFood = err.contains("not food", ignoreCase = true) ||
+                            err.contains("non-food", ignoreCase = true) ||
+                            err.contains("not appear to contain", ignoreCase = true) ||
+                            err.contains("animal", ignoreCase = true) ||
+                            err.contains("cat", ignoreCase = true) ||
+                            err.contains("person", ignoreCase = true) ||
+                            err.contains("meal or beverage", ignoreCase = true)
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isNonFood) Color(0xFFFFFBEB) else Color(0xFFFFF1F2)
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isNonFood) Color(0xFFFDE68A) else Color(0xFFFECDD3)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (isNonFood) Icons.Filled.Error else Icons.Filled.Cancel,
+                            contentDescription = null,
+                            tint = if (isNonFood) Amber else Rose,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (isNonFood) "Please Select a Food Picture" else "Analysis Notice",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (isNonFood) Color(0xFF92400E) else Rose
+                        )
+                    }
+                    Text(
+                        err,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isNonFood) Color(0xFF78350F) else Rose
+                    )
+                    if (isNonFood) {
+                        Spacer(Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { launchCamera() },
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldDark),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Icon(Icons.Filled.PhotoCamera, null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Retake Photo", fontSize = 12.sp)
+                            }
+                            OutlinedButton(
+                                onClick = { pickLauncher.launch("image/*") },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Text("Choose Food Image", fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
             }
         }
 

@@ -274,18 +274,21 @@ fun OnboardingDialog(
 
                     Spacer(Modifier.height(12.dp))
 
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(
-                            value = ageText,
-                            onValueChange = { if (it.all { c -> c.isDigit() } && it.length <= 3) ageText = it },
-                            label = { Text("Age (yrs)") },
-                            placeholder = { Text("35") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.weight(1f)
-                        )
+                    OutlinedTextField(
+                        value = ageText,
+                        onValueChange = { if (it.all { c -> c.isDigit() } && it.length <= 3) ageText = it },
+                        label = { Text("Age (years)") },
+                        placeholder = { Text("e.g. 35") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
+                    Spacer(Modifier.height(12.dp))
+
+                    // Height and Weight Matched Pair
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = heightText,
                             onValueChange = { heightText = it },

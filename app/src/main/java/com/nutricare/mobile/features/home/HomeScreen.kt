@@ -13,6 +13,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -213,9 +215,22 @@ fun HomeScreen(
         vm.load(context)
     }
 
+    val onboardingPrefs = remember(context) {
+        context.getSharedPreferences("nutricare_onboarding_prefs", Context.MODE_PRIVATE)
+    }
+
     LaunchedEffect(state.loading, state.profile) {
-        if (!state.loading && state.profile?.age == null) {
-            showOnboarding = true
+        if (!state.loading && state.profile != null) {
+            val uid = state.profile?.id ?: "guest"
+            val hasSeen = onboardingPrefs.getBoolean("has_seen_onboarding_$uid", false) ||
+                          onboardingPrefs.getBoolean("has_seen_onboarding_device", false)
+            if (!hasSeen && state.profile?.age == null) {
+                showOnboarding = true
+                onboardingPrefs.edit()
+                    .putBoolean("has_seen_onboarding_$uid", true)
+                    .putBoolean("has_seen_onboarding_device", true)
+                    .apply()
+            }
         }
     }
 
@@ -225,8 +240,20 @@ fun HomeScreen(
             initialProfile = state.profile,
             initialConditions = state.conditions,
             isEditing = false,
-            onDismiss = { showOnboarding = false },
+            onDismiss = {
+                val uid = state.profile?.id ?: "guest"
+                onboardingPrefs.edit()
+                    .putBoolean("has_seen_onboarding_$uid", true)
+                    .putBoolean("has_seen_onboarding_device", true)
+                    .apply()
+                showOnboarding = false
+            },
             onSaved = { updatedProfile, updatedConditions ->
+                val uid = state.profile?.id ?: "guest"
+                onboardingPrefs.edit()
+                    .putBoolean("has_seen_onboarding_$uid", true)
+                    .putBoolean("has_seen_onboarding_device", true)
+                    .apply()
                 vm.onProfileSaved(updatedProfile, updatedConditions)
                 showOnboarding = false
             }
@@ -896,7 +923,7 @@ private fun AllGraphsHubSection(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            // Header & Category Switcher (Single-line pills matching web)
+            // Header & Live Badge
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -908,56 +935,80 @@ private fun AllGraphsHubSection(
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF64748B)
                 )
-
-                // Sub-category selector (Biomarkers, Calories, Weight)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier
-                        .background(Color(0xFFF1F5F9), RoundedCornerShape(50))
-                        .padding(3.dp)
+                Box(
+                    Modifier
+                        .background(Color(0xFFECFDF5), RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
-                    listOf("Biomarkers", "Calories", "Weight").forEach { cat ->
-                        val isSel = cat == graphCategory
-                        Box(
-                            Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(if (isSel) EmeraldDark else Color.Transparent)
-                                .clickable { graphCategory = cat }
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
-                        ) {
-                            Text(
-                                cat,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSel) Color.White else Color(0xFF64748B)
-                            )
-                        }
+                    Text(
+                        "Clinical Analytics",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = EmeraldDark
+                    )
+                }
+            }
+
+            // Standardized Equal-Width Category Selector (Biomarkers, Calories, Weight)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF1F5F9), RoundedCornerShape(14.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf("Biomarkers", "Calories", "Weight").forEach { cat ->
+                    val isSel = cat == graphCategory
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSel) EmeraldDark else Color.Transparent)
+                            .clickable { graphCategory = cat },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            cat,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSel) Color.White else Color(0xFF64748B)
+                        )
                     }
                 }
             }
 
             when (graphCategory) {
                 "Biomarkers" -> {
-                    // Biomarker parameter selector
+                    // Standardized Horizontal Scrollable Biomarker Chips
                     Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         listOf("eGFR", "Creatinine", "Glucose", "Hemoglobin", "Potassium").forEach { marker ->
                             val isSel = marker == selectedBiomarker
                             Box(
                                 Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSel) Color(0xFFE6F4EA) else Color.Transparent)
-                                    .border(1.dp, if (isSel) EmeraldDark else Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+                                    .height(34.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (isSel) Color(0xFFECFDF5) else Color(0xFFF8FAFC))
+                                    .border(
+                                        width = if (isSel) 1.5.dp else 1.dp,
+                                        color = if (isSel) EmeraldDark else Color(0xFFE2E8F0),
+                                        shape = RoundedCornerShape(50)
+                                    )
                                     .clickable { selectedBiomarker = marker }
-                                    .padding(horizontal = 7.dp, vertical = 4.dp)
+                                    .padding(horizontal = 14.dp),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     marker,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSel) EmeraldDark else Slate
+                                    color = if (isSel) EmeraldDark else Color(0xFF475569)
                                 )
                             }
                         }
