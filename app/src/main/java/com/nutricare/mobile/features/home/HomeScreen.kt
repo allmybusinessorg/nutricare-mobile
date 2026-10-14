@@ -40,6 +40,8 @@ import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.RestaurantMenu
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.WaterDrop
@@ -699,6 +701,62 @@ fun HomeScreen(
                                 }
                             }
                             Icon(Icons.Filled.ChevronRight, null, tint = Slate, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+
+                // --- CLINICAL DIETITIAN & RECIPES QUICK LAUNCHERS ---
+                item {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Contact Dietitian
+                        Card(
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            elevation = CardDefaults.cardElevation(2.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onNavigate("dietitians") }
+                        ) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(
+                                    Modifier
+                                        .size(38.dp)
+                                        .background(Color(0xFFEFF6FF), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Filled.SupportAgent, null, tint = Color(0xFF2563EB), modifier = Modifier.size(20.dp))
+                                }
+                                Text("Dietitians", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Consult clinical specialists", fontSize = 11.sp, color = Slate, maxLines = 1)
+                            }
+                        }
+
+                        // Clinical Recipes
+                        Card(
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            elevation = CardDefaults.cardElevation(2.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onNavigate("recipes") }
+                        ) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(
+                                    Modifier
+                                        .size(38.dp)
+                                        .background(Color(0xFFFEF3C7), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Filled.RestaurantMenu, null, tint = Color(0xFFD97706), modifier = Modifier.size(20.dp))
+                                }
+                                Text("Safe Recipes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Disease-tailored meals", fontSize = 11.sp, color = Slate, maxLines = 1)
+                            }
                         }
                     }
                 }

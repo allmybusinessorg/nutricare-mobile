@@ -37,6 +37,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        com.nutricare.mobile.core.AppTelemetry.onAppForeground(this)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        com.nutricare.mobile.core.AppTelemetry.onAppBackground(this)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleAuthIntent(intent)

@@ -26,12 +26,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -237,7 +240,11 @@ class ProfileViewModel : ViewModel() {
 }
 
 @Composable
-fun ProfileScreen(onSignedOut: () -> Unit = {}, vm: ProfileViewModel = viewModel()) {
+fun ProfileScreen(
+    onSignedOut: () -> Unit = {},
+    onNavigate: (String) -> Unit = {},
+    vm: ProfileViewModel = viewModel()
+) {
     val state by vm.state.collectAsState()
     val context = LocalContext.current
 
@@ -503,6 +510,65 @@ fun ProfileScreen(onSignedOut: () -> Unit = {}, vm: ProfileViewModel = viewModel
                             )
                         }
                     }
+                }
+            }
+        }
+
+        // --- CLINICAL SPECIALISTS & RECIPES SHORTCUTS ---
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(2.dp)
+        ) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("CLINICAL SERVICES", style = MaterialTheme.typography.labelSmall, color = EmeraldDark)
+
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigate("dietitians") }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(38.dp).background(Color(0xFFEFF6FF), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.SupportAgent, null, tint = Color(0xFF2563EB), modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column {
+                            Text("Contact Clinical Dietitian", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text("Hospital-certified nutritionist booking & review", fontSize = 11.sp, color = Slate)
+                        }
+                    }
+                    Icon(Icons.Filled.ChevronRight, null, tint = Slate, modifier = Modifier.size(18.dp))
+                }
+
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigate("recipes") }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(38.dp).background(Color(0xFFFEF3C7), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.RestaurantMenu, null, tint = Color(0xFFD97706), modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column {
+                            Text("Disease-Safe Recipes", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text("CKD, Diabetes & DASH culinary formulas", fontSize = 11.sp, color = Slate)
+                        }
+                    }
+                    Icon(Icons.Filled.ChevronRight, null, tint = Slate, modifier = Modifier.size(18.dp))
                 }
             }
         }

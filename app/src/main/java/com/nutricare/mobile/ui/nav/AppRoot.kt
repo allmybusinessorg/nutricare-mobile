@@ -101,9 +101,11 @@ fun AppRoot() {
             composable("scan") { ScanScreen() }
             composable("reports") { ReportsScreen() }
             composable("chat") { ChatScreen() }
-            composable("profile") { ProfileScreen(onSignedOut = { navController.navigate("login") { popUpTo(0) { inclusive = true } } }) }
+            composable("profile") { ProfileScreen(onSignedOut = { navController.navigate("login") { popUpTo(0) { inclusive = true } } }, onNavigate = { route -> navController.navigate(route) }) }
             composable("medications") { com.nutricare.mobile.features.medications.MedicationsScreen(onBack = { navController.popBackStack() }) }
             composable("wearables") { WearablesScreen(onBack = { navController.popBackStack() }) }
+            composable("dietitians") { com.nutricare.mobile.features.dietitian.DietitianScreen(onBack = { navController.popBackStack() }) }
+            composable("recipes") { com.nutricare.mobile.features.recipes.RecipesScreen(onBack = { navController.popBackStack() }) }
         }
     }
 }

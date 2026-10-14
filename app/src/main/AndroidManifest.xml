@@ -27,7 +27,8 @@
         android:label="NutriCare"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.NutriCare"
-        android:allowBackup="true">
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false">
 
         <activity
             android:name=".MainActivity"
