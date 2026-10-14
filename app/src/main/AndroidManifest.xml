@@ -14,6 +14,11 @@
         android:name="android.permission.BLUETOOTH_ADMIN"
         android:maxSdkVersion="30" />
 
+    <!-- Medication reminders -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:name=".NutriApp"
         android:label="NutriCare"
@@ -38,6 +43,17 @@
                 <data android:scheme="nutricare" android:host="auth" android:path="/callback" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".features.medications.ReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".features.medications.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -50,8 +50,8 @@ class ApiClient(
             ServiceLocator.json.decodeFromString(it)
         }
 
-    suspend fun extractReport(fileUrl: String): OcrResponse =
-        post("/api/ocr", OcrRequest(fileUrl)) { ServiceLocator.json.decodeFromString(it) }
+    suspend fun extractReport(fileUrl: String, reportType: String? = null): OcrResponse =
+        post("/api/ocr", OcrRequest(fileUrl = fileUrl, reportType = reportType)) { ServiceLocator.json.decodeFromString(it) }
 
     suspend fun chat(message: String): ChatSimpleResponse =
         post("/api/chat-simple", ChatSimpleRequest(message)) { ServiceLocator.json.decodeFromString(it) }

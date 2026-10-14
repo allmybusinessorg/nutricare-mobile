@@ -102,6 +102,7 @@ fun AppRoot() {
             composable("reports") { ReportsScreen() }
             composable("chat") { ChatScreen() }
             composable("profile") { ProfileScreen(onSignedOut = { navController.navigate("login") { popUpTo(0) { inclusive = true } } }) }
+            composable("medications") { com.nutricare.mobile.features.medications.MedicationsScreen(onBack = { navController.popBackStack() }) }
             composable("wearables") { WearablesScreen(onBack = { navController.popBackStack() }) }
         }
     }

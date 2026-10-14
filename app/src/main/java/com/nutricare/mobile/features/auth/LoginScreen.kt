@@ -36,7 +36,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.content.Context
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.nutricare.mobile.BuildConfigHolder
+import com.nutricare.mobile.core.GoogleOAuth
 import com.nutricare.mobile.core.ServiceLocator
 import com.nutricare.mobile.ui.theme.Emerald
 import com.nutricare.mobile.ui.theme.EmeraldDark
@@ -93,27 +101,64 @@ class AuthViewModel : ViewModel() {
     }
 
     /**
-     * Native Google sign-in: opens the Supabase OAuth authorize URL in a
-     * browser tab; Google returns to nutricare://auth/callback and
-     * MainActivity imports the session (same identity as the website).
+     * Google sign-in, native-first:
+     *  1. Credential Manager bottom-sheet account picker (the standard
+     *     Android experience) -> Google ID token -> Supabase IDToken grant.
+     *  2. If the picker isn't available on this device (e.g. no Google Play
+     *     services or the OAuth client isn't registered yet), fall back to
+     *     the browser PKCE flow.
      */
-    fun signInWithGoogle() {
+    fun signInWithGoogle(context: Context) {
         error.value = null
-        val redirect = "nutricare://auth/callback"
-        val url = "${BuildConfigHolder.SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=" +
-            android.net.Uri.encode(redirect)
-        try {
-            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            com.nutricare.mobile.NutriApp.instance.startActivity(intent)
-        } catch (e: Exception) {
-            error.value = "Could not open the browser for Google sign-in."
+        loading.value = true
+        viewModelScope.launch {
+            try {
+                val credentialManager = CredentialManager.create(context)
+                val googleIdOption = GetGoogleIdOption.Builder()
+                    .setServerClientId(BuildConfigHolder.GOOGLE_WEB_CLIENT_ID)
+                    .setFilterByAuthorizedAccounts(false)
+                    .setAutoSelectEnabled(false)
+                    .build()
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
+
+                val response = credentialManager.getCredential(context, request)
+                val credential = response.credential
+                if (credential is CustomCredential &&
+                    credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                ) {
+                    val googleId = GoogleIdTokenCredential.createFrom(credential.data)
+                    val session = GoogleOAuth.signInWithGoogleIdToken(googleId.idToken)
+                    ServiceLocator.supabase.auth.importSession(session)
+                    loggedIn.value = true
+                } else {
+                    error.value = "Unexpected Google response. Please try again."
+                }
+            } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
+                // User closed the account picker — not an error.
+            } catch (e: Exception) {
+                android.util.Log.e("NutriGoogle", "Native picker failed: ${e.javaClass.simpleName}: ${e.message}", e)
+                // Native picker unavailable (e.g. Android OAuth client not yet
+                // registered in Google Cloud) -> browser flow fallback.
+                try {
+                    val intent = android.content.Intent(
+                        android.content.Intent.ACTION_VIEW, GoogleOAuth.start()
+                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                } catch (e2: Exception) {
+                    error.value = "Google sign-in is unavailable on this device."
+                }
+            } finally {
+                loading.value = false
+            }
         }
     }
 }
 
 @Composable
 fun LoginScreen(onLoggedIn: () -> Unit, vm: AuthViewModel = viewModel()) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val email by vm.email.collectAsState()
     val password by vm.password.collectAsState()
     val isSignUp by vm.isSignUp.collectAsState()
@@ -124,6 +169,12 @@ fun LoginScreen(onLoggedIn: () -> Unit, vm: AuthViewModel = viewModel()) {
 
     LaunchedEffect(loggedIn) {
         if (loggedIn) onLoggedIn()
+    }
+
+    LaunchedEffect(Unit) {
+        com.nutricare.mobile.core.AuthEventBus.oauthError.collect { msg ->
+            vm.error.value = msg
+        }
     }
 
     Box(
@@ -211,7 +262,7 @@ fun LoginScreen(onLoggedIn: () -> Unit, vm: AuthViewModel = viewModel()) {
 
             // Google sign-in (uses the same Google OAuth the website uses)
             androidx.compose.material3.OutlinedButton(
-                onClick = { vm.signInWithGoogle() },
+                onClick = { vm.signInWithGoogle(context) },
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()

@@ -32,6 +32,11 @@ data class BloodReport(
     val potassium: Double? = null,
     val sodium: Double? = null,
     val glucose: Double? = null,
+    val hemoglobin: Double? = null,
+    val albumin: Double? = null,
+    val phosphorus: Double? = null,
+    val blood_pressure: String? = null,
+    val file_url: String? = null,
 )
 
 @Serializable
@@ -83,6 +88,14 @@ data class NutrientFlag(
 // ---- API request/response shapes for the deployed AI endpoints ----
 
 @Serializable
+data class Medication(
+    val id: String? = null,
+    val name: String = "",
+    val dosage: String? = null,
+    val time_to_take: String? = null,
+)
+
+@Serializable
 data class AnalyzeFoodRequest(
     val foodDescription: String? = null,
     val fileUrl: String? = null,
@@ -99,6 +112,7 @@ data class AnalyzeFoodResponse(
 @Serializable
 data class OcrRequest(
     val fileUrl: String,
+    val reportType: String? = null,
 )
 
 @Serializable
@@ -117,6 +131,11 @@ data class OcrData(
     val potassium: Double? = null,
     val sodium: Double? = null,
     val glucose: Double? = null,
+    val hemoglobin: Double? = null,
+    val albumin: Double? = null,
+    val phosphorus: Double? = null,
+    val blood_pressure: String? = null,
+    val audioSummary: String? = null,
 )
 
 @Serializable

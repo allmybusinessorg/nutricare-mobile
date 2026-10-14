@@ -86,10 +86,12 @@ class ChatViewModel : ViewModel() {
                     ?: "I couldn't generate a response right now. ${reply.error ?: "Please try again."}"
                 state.update { it.copy(loading = false, messages = it.messages + ChatMessage(false, answer)) }
             } catch (e: Exception) {
+                android.util.Log.e("NutriChat", "chat failed", e)
+                val detail = e.message?.takeIf { m -> m.isNotBlank() } ?: "check your connection and try again."
                 state.update {
                     it.copy(
                         loading = false,
-                        messages = it.messages + ChatMessage(false, "Sorry — I couldn't reach the AI service. Check your connection and try again."),
+                        messages = it.messages + ChatMessage(false, "Sorry — I couldn't answer that. $detail"),
                     )
                 }
             }

@@ -49,6 +49,7 @@ import com.nutricare.mobile.data.BloodReport
 import com.nutricare.mobile.data.FoodUploadRow
 import com.nutricare.mobile.data.Profile
 import com.nutricare.mobile.data.UserDiseaseRow
+import androidx.compose.material.icons.filled.Medication
 import com.nutricare.mobile.ui.theme.Amber
 import com.nutricare.mobile.ui.theme.Emerald
 import com.nutricare.mobile.ui.theme.EmeraldDark
@@ -67,6 +68,7 @@ data class HomeUiState(
     val conditions: List<String> = emptyList(),
     val latestReport: BloodReport? = null,
     val recentScans: List<FoodUploadRow> = emptyList(),
+    val reports: List<BloodReport> = emptyList(),
     val loading: Boolean = true,
 )
 
@@ -96,7 +98,7 @@ class HomeViewModel : ViewModel() {
                     client.from("blood_reports").select() {
                         filter { eq("profile_id", user.id) }
                         order("report_date", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
-                        limit(1)
+                        limit(10)
                     }.decodeList<BloodReport>()
                 }.getOrDefault(emptyList())
 
@@ -113,6 +115,7 @@ class HomeViewModel : ViewModel() {
                         name = profile?.name?.split(" ")?.firstOrNull() ?: "there",
                         conditions = diseases.mapNotNull { d -> d.diseases?.name },
                         latestReport = reports.firstOrNull(),
+                        reports = reports,
                         recentScans = scans,
                         loading = false,
                     )
@@ -199,6 +202,27 @@ fun HomeScreen(onNavigate: (String) -> Unit = {}, vm: HomeViewModel = viewModel(
             }
         }
 
+        // Medications card
+        item {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F3FF)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigate("medications") },
+            ) {
+                Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Medication, null, tint = Color(0xFF7C3AED), modifier = Modifier.size(26.dp))
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Medications & reminders", style = MaterialTheme.typography.titleMedium)
+                        Text("Daily dose notifications", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Icon(Icons.Filled.ChevronRight, null, tint = Color(0xFF7C3AED))
+                }
+            }
+        }
+
         // Wearables teaser
         item {
             Card(
@@ -208,6 +232,12 @@ fun HomeScreen(onNavigate: (String) -> Unit = {}, vm: HomeViewModel = viewModel(
                     .fillMaxWidth()
                     .clickable { onNavigate("wearables") },
             ) {
+
+        // Biomarker trends chart
+        item {
+            val reportsAsc = state.reports.sortedBy { it.report_date ?: "" }
+            TrendCard(reportsAsc)
+        }
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Watch, null, tint = Color(0xFF7C3AED), modifier = Modifier.size(26.dp))
                     Spacer(Modifier.width(14.dp))
@@ -315,3 +345,66 @@ private fun ScanRow(s: FoodUploadRow) {
         }
     }
 }
+
+@androidx.compose.runtime.Composable
+private fun TrendCard(reportsAsc: List<BloodReport>) {
+    val metrics = listOf("Glucose" to "glucose", "eGFR" to "egfr", "Creatinine" to "creatinine", "Potassium" to "potassium", "Sodium" to "sodium")
+    val selected = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("Glucose") }
+    val key = metrics.first { it.first == selected.value }.second
+
+    fun value(r: BloodReport): Double? = when (key) {
+        "glucose" -> r.glucose
+        "egfr" -> r.egfr
+        "creatinine" -> r.creatinine
+        "potassium" -> r.potassium
+        "sodium" -> r.sodium
+        else -> null
+    }
+
+    val points = reportsAsc.mapNotNull { r ->
+        val v = value(r) ?: return@mapNotNull null
+        (r.report_date?.take(5) ?: "") to v
+    }
+
+    Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(1.dp)) {
+        Column(Modifier.padding(18.dp)) {
+            Text("BIOMARKER TRENDS", style = MaterialTheme.typography.labelSmall, color = EmeraldDark)
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                metrics.take(3).forEach { (label, _) ->
+                    val active = selected.value == label
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .background(if (active) Color(0xFFECFDF5) else Mist, RoundedCornerShape(12.dp))
+                            .clickable { selected.value = label }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(label, style = MaterialTheme.typography.labelSmall, color = if (active) EmeraldDark else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                metrics.drop(3).forEach { (label, _) ->
+                    val active = selected.value == label
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .background(if (active) Color(0xFFECFDF5) else Mist, RoundedCornerShape(12.dp))
+                            .clickable { selected.value = label }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(label, style = MaterialTheme.typography.labelSmall, color = if (active) EmeraldDark else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(8.dp))
+            TrendChart(points = points)
+        }
+    }
+}
+

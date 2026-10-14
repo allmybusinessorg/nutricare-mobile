@@ -4,10 +4,11 @@ import io.github.jan.supabase.auth.user.UserSession
 import kotlinx.coroutines.flow.MutableSharedFlow
 
 /**
- * Tiny event bus: MainActivity feeds OAuth deep links here via the Supabase
- * SDK's handleDeeplinks(); the nav root listens and moves to Home when a
- * session arrives.
+ * Tiny event bus: MainActivity feeds OAuth deep links here after importing
+ * the session; the nav root listens and moves to Home. OAuth failures are
+ * surfaced to the login screen so the user always gets feedback.
  */
 object AuthEventBus {
     val sessionArrived = MutableSharedFlow<UserSession>(extraBufferCapacity = 1)
+    val oauthError = MutableSharedFlow<String>(extraBufferCapacity = 1)
 }
