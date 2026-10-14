@@ -129,6 +129,7 @@ class MedicationsViewModel : ViewModel() {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun MedicationsScreen(onBack: () -> Unit, vm: MedicationsViewModel = viewModel()) {
     val state by vm.state.collectAsState()
@@ -185,7 +186,7 @@ fun MedicationsScreen(onBack: () -> Unit, vm: MedicationsViewModel = viewModel()
             } else if (state.medications.isEmpty()) {
                 item {
                     Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Mist)) {
-                        Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Filled.Medication, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(34.dp))
                             Spacer(Modifier.height(8.dp))
                             Text("No medications yet", style = MaterialTheme.typography.titleMedium)

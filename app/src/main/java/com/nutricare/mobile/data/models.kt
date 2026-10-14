@@ -11,6 +11,20 @@ data class Profile(
     val height: Double? = null,
     val gender: String? = null,
     val goal: String? = null,
+    val pro_status: Boolean? = null,
+    val pro_expires_at: String? = null,
+    val referral_code: String? = null,
+)
+
+@Serializable
+data class FamilyMember(
+    val id: String? = null,
+    val user_id: String? = null,
+    val name: String = "",
+    val relationship: String = "",
+    val age: Int? = null,
+    val gender: String? = null,
+    val created_at: String? = null,
 )
 
 @Serializable

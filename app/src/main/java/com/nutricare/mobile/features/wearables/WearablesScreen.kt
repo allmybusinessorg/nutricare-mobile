@@ -91,11 +91,14 @@ class WearablesViewModel : ViewModel() {
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     gatt = g
-                    state.update { it.copy(status = "Connected — discovering services…", connectedName = g.device?.name ?: it.connectedName) }
+                    val devName = g.device?.name ?: "BLE Smartwatch"
+                    state.update { it.copy(status = "Connected — discovering services…", connectedName = devName) }
+                    com.nutricare.mobile.core.WatchManager.connectDevice(devName)
                     g.discoverServices()
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     state.update { it.copy(status = "Disconnected. Tap a device to reconnect.", heartRate = null, connectedName = null) }
+                    com.nutricare.mobile.core.WatchManager.disconnect()
                     g.close()
                     if (gatt === g) gatt = null
                 }
@@ -131,6 +134,7 @@ class WearablesViewModel : ViewModel() {
                 val bpm = if (flags and 0x01 == 0) value[1].toInt() and 0xFF
                 else ((value[2].toInt() and 0xFF) shl 8) or (value[1].toInt() and 0xFF)
                 state.update { it.copy(heartRate = bpm) }
+                com.nutricare.mobile.core.WatchManager.updateHeartRate(bpm)
             }
         }
     }
