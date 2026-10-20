@@ -88,7 +88,8 @@ class ScanViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val client = ServiceLocator.supabase
-                val user = client.auth.currentUserOrNull() ?: throw Exception("Please sign in first")
+                val user = com.nutricare.mobile.core.SessionStore.ensureActiveUser()
+                    ?: throw Exception("Please sign in first")
 
                 var fileUrl: String? = null
                 s.photoUri?.let { uri ->
@@ -96,7 +97,12 @@ class ScanViewModel : ViewModel() {
                         ?: throw Exception("Could not read the photo")
                     val ext = context.contentResolver.getType(uri)?.substringAfterLast('/') ?: "jpg"
                     val name = "${user.id}-food-${System.currentTimeMillis()}.$ext"
-                    client.storage.from("reports").upload(name, bytes)
+                    try {
+                        client.storage.from("reports").upload(name, bytes)
+                    } catch (storageErr: Exception) {
+                        client.auth.refreshCurrentSession()
+                        client.storage.from("reports").upload(name, bytes)
+                    }
                     fileUrl = client.storage.from("reports").publicUrl(name)
                 }
 

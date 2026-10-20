@@ -143,7 +143,7 @@ class ReportsViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val client = ServiceLocator.supabase
-                val user = client.auth.currentUserOrNull() ?: return@launch
+                val user = com.nutricare.mobile.core.SessionStore.ensureActiveUser() ?: return@launch
                 val reports = client.from("blood_reports").select() {
                     filter { eq("profile_id", user.id) }
                     order("report_date", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
@@ -162,7 +162,8 @@ class ReportsViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val client = ServiceLocator.supabase
-                val user = client.auth.currentUserOrNull() ?: throw Exception("Please sign in first")
+                val user = com.nutricare.mobile.core.SessionStore.ensureActiveUser()
+                    ?: throw Exception("Please sign in first")
                 val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     ?: throw Exception("Could not read the selected file")
                 val mimeType = context.contentResolver.getType(uri)?.lowercase() ?: ""
@@ -174,7 +175,12 @@ class ReportsViewModel : ViewModel() {
                     else -> "jpg"
                 }
                 val name = "${user.id}-report-${System.currentTimeMillis()}.$ext"
-                client.storage.from("reports").upload(name, bytes)
+                try {
+                    client.storage.from("reports").upload(name, bytes)
+                } catch (storageErr: Exception) {
+                    client.auth.refreshCurrentSession()
+                    client.storage.from("reports").upload(name, bytes)
+                }
                 val fileUrl = client.storage.from("reports").publicUrl(name)
 
                 val result = ServiceLocator.api.extractReport(fileUrl, currentType)

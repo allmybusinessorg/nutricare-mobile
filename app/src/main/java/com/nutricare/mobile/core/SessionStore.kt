@@ -72,6 +72,18 @@ object SessionStore {
         }
     }
 
+    fun getSavedSession(): UserSession? {
+        val ctx = appContext ?: return null
+        return runCatching {
+            val jsonStr = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null) ?: return null
+            ServiceLocator.json.decodeFromString(UserSession.serializer(), jsonStr)
+        }.getOrNull()
+    }
+
+    fun getSavedUserId(): String? {
+        return getSavedSession()?.user?.id
+    }
+
     fun getSavedAccessToken(): String? {
         val ctx = appContext ?: return null
         return runCatching {
@@ -88,5 +100,42 @@ object SessionStore {
             val session = ServiceLocator.json.decodeFromString(UserSession.serializer(), jsonStr)
             session.refreshToken
         }.getOrNull()
+    }
+
+    /**
+     * Guarantees an active, authenticated user is available before network or storage calls.
+     * Checks in-memory session, restores from SharedPreferences, or refreshes if expired.
+     */
+    suspend fun ensureActiveUser(): io.github.jan.supabase.auth.user.UserInfo? {
+        val client = ServiceLocator.supabase
+        // 1. In-memory user
+        var user = client.auth.currentUserOrNull()
+        if (user != null) return user
+
+        // 2. Import saved session from disk
+        val saved = getSavedSession()
+        if (saved != null) {
+            runCatching {
+                client.auth.importSession(saved)
+                user = client.auth.currentUserOrNull()
+            }
+            if (user != null) return user
+        }
+
+        // 3. Try refreshing the session with the saved refresh token
+        val refresh = getSavedRefreshToken()
+        if (!refresh.isNullOrBlank()) {
+            runCatching {
+                client.auth.refreshCurrentSession()
+                val refreshed = client.auth.currentSessionOrNull()
+                if (refreshed != null) {
+                    saveSession(refreshed)
+                    user = refreshed.user
+                }
+            }
+            if (user != null) return user
+        }
+
+        return saved?.user
     }
 }

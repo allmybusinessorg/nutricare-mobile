@@ -72,7 +72,7 @@ class MedicationsViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val client = ServiceLocator.supabase
-                val user = client.auth.currentUserOrNull() ?: return@launch
+                val user = com.nutricare.mobile.core.SessionStore.ensureActiveUser() ?: return@launch
                 val meds = client.from("medications").select() {
                     filter { eq("profile_id", user.id) }
                     order("time_to_take", io.github.jan.supabase.postgrest.query.Order.ASCENDING)
@@ -89,7 +89,8 @@ class MedicationsViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val client = ServiceLocator.supabase
-                val user = client.auth.currentUserOrNull() ?: throw Exception("Please sign in first")
+                val user = com.nutricare.mobile.core.SessionStore.ensureActiveUser()
+                    ?: throw Exception("Please sign in first")
                 val formattedTime = if (time.length == 5) "$time:00" else time
                 val inserted = client.from("medications").insert(
                     mapOf(

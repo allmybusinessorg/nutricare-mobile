@@ -191,7 +191,8 @@ class DietitianViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val client = ServiceLocator.supabase
-                val user = client.auth.currentUserOrNull() ?: throw Exception("Please sign in first")
+                val user = com.nutricare.mobile.core.SessionStore.ensureActiveUser()
+                    ?: throw Exception("Please sign in first")
 
                 // 1. Delete previous link if any
                 runCatching {

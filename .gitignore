@@ -14,3 +14,6 @@
 .env*
 *.keystore
 !debug.keystore
+
+*.apk
+*.aab

@@ -100,6 +100,12 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    private tailrec fun Context.findActivity(): android.app.Activity? = when (this) {
+        is android.app.Activity -> this
+        is android.content.ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }
+
     /**
      * Google sign-in, native-first:
      *  1. Credential Manager bottom-sheet account picker (the standard
@@ -113,7 +119,9 @@ class AuthViewModel : ViewModel() {
         loading.value = true
         viewModelScope.launch {
             try {
-                val credentialManager = CredentialManager.create(context)
+                val activity = context.findActivity() ?: (context as? android.app.Activity)
+                val targetContext = activity ?: context
+                val credentialManager = CredentialManager.create(targetContext)
                 val googleIdOption = GetGoogleIdOption.Builder()
                     .setServerClientId(BuildConfigHolder.GOOGLE_WEB_CLIENT_ID)
                     .setFilterByAuthorizedAccounts(false)
@@ -123,7 +131,7 @@ class AuthViewModel : ViewModel() {
                     .addCredentialOption(googleIdOption)
                     .build()
 
-                val response = credentialManager.getCredential(context, request)
+                val response = credentialManager.getCredential(targetContext, request)
                 val credential = response.credential
                 if (credential is CustomCredential &&
                     credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
@@ -131,6 +139,7 @@ class AuthViewModel : ViewModel() {
                     val googleId = GoogleIdTokenCredential.createFrom(credential.data)
                     val session = GoogleOAuth.signInWithGoogleIdToken(googleId.idToken)
                     ServiceLocator.supabase.auth.importSession(session)
+                    com.nutricare.mobile.core.SessionStore.saveSession(session)
                     loggedIn.value = true
                 } else {
                     error.value = "Unexpected Google response. Please try again."
